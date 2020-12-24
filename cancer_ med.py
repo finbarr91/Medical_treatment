@@ -40,3 +40,26 @@ data_variants = pd.read_csv('training_variants')
 data_text = pd.read_csv('training_text', sep='\|\|', engine = 'python', names = ['ID','TEXT'],skiprows=1)
 
 print(data_variants.head(3))
+"""
+Let's understand the above data.
+There are 4 fields above:
+ID : row id used to link the mutation to the clinical evidence.
+Gene : The gene where the genetic mutation is located
+Variation : The aminoacid change for this mutations
+Class : the class value 1-9, this genetic mutation has been classified on
+"""
+
+print(data_variants.info())
+
+print(data_variants.describe())
+
+# Checking the dimensions of the data
+print(data_variants.shape)
+
+# Checking the columns of the above dataset
+print(data_variants.columns)
+
+# Let's explore the training data text
+print(data_text.head(3))
+print(data_text.info())
+print(data_text.describe())
