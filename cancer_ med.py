@@ -39,4 +39,4 @@ data_variants = pd.read_csv('training_variants')
 # Loading the training_text dataset. This is separated by //
 data_text = pd.read_csv('training_text', sep='\|\|', engine = 'python', names = ['ID','TEXT'],skiprows=1)
 
-
+print(data_variants.head(3))
