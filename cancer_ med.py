@@ -381,12 +381,140 @@ build model having only gene column with one hot encoder with simple model like 
 If log loss with only one column Gene comes out to be better than random model, than this feature is important.
 """
 
+# We need a hyperparameter for the SGD classifier.
+alpha = [10** x for x in range(-5,1)]
 
+# We will be using SGD classifier
+# we will also be using Caliberated Classifier to get the result into probability format to be used for
+# for log loss .
+cv_log_error_array = []
+for i in alpha:
+    clf = SGDClassifier(alpha=i,penalty = 'l2', loss='log', random_state=42)
+    clf.fit(train_gene_feature_onehotCoding, y_train)
+    sig_clf = CalibratedClassifierCV(clf, method = 'sigmoid')
+    sig_clf.fit(train_gene_feature_onehotCoding,y_train)
+    predict_y = sig_clf.predict_proba(cv_gene_feature_onehotCoding)
+    cv_log_error_array.append(log_loss(y_cv,predict_y,labels = clf.classes_,eps=1e-15))
+    print("For values of alpha =", i, 'The log loss is', log_loss(y_cv, predict_y, labels = clf.classes_, eps=1e-15))
 
+# Let's plot the same to check the best Alpha value
+fig,ax = plt.subplots()
+ax.plot(alpha,cv_log_error_array, c='g')
+for i, txt in enumerate(np.round(cv_log_error_array,3)):
+    ax.annotate((alpha[i], np.round(txt,3)), (alpha[i], cv_log_error_array[i]))
+    plt.grid()
+plt.title("Cross validation Error for each alpha")
+plt.xlabel("Alpha i's")
+plt.ylabel("Error measure")
+plt.show()
 
+# Lets use best alpha value as we can see from above graph and compute log loss
+best_alpha = np.argmin(cv_log_error_array)
+clf = SGDClassifier(alpha=alpha[best_alpha], penalty='l2', loss='log', random_state=42)
+clf.fit(train_gene_feature_onehotCoding, y_train)
+sig_clf = CalibratedClassifierCV(clf, method="sigmoid")
+sig_clf.fit(train_gene_feature_onehotCoding, y_train)
 
+predict_y = sig_clf.predict_proba(train_gene_feature_onehotCoding)
+print('For values of best alpha = ', alpha[best_alpha], "The train log loss is:",log_loss(y_train, predict_y, labels=clf.classes_, eps=1e-15))
+predict_y = sig_clf.predict_proba(cv_gene_feature_onehotCoding)
+print('For values of best alpha = ', alpha[best_alpha], "The cross validation log loss is:",log_loss(y_cv, predict_y, labels=clf.classes_, eps=1e-15))
+predict_y = sig_clf.predict_proba(test_gene_feature_onehotCoding)
+print('For values of best alpha = ', alpha[best_alpha], "The test log loss is:",log_loss(y_test, predict_y, labels=clf.classes_, eps=1e-15))
 
+test_coverage=test_df[test_df['Gene'].isin(list(set(train_df['Gene'])))].shape[0]
+cv_coverage=cv_df[cv_df['Gene'].isin(list(set(train_df['Gene'])))].shape[0]
 
+print('1. In test data',test_coverage, 'out of',test_df.shape[0], ":",(test_coverage/test_df.shape[0])*100)
+print('2. In cross validation data',cv_coverage, 'out of ',cv_df.shape[0],":" ,(cv_coverage/cv_df.shape[0])*100)
+
+"""
+Evaluating Variation column
+Variation is also a categorical variable so we have to deal in same way like we have done for Gene column. We will again get the one hot encoder and response enoding variable for variation column.
+"""
+unique_variations = train_df['Variation'].value_counts()
+print('Number of Unique Variations :', unique_variations.shape[0])
+# the top 10 variations that occured most
+print(unique_variations.head(10))
+
+s = sum(unique_variations.values)
+h = unique_variations.values/s
+c = np.cumsum(h)
+print(c)
+plt.plot(c,label='Cumulative distribution of Variations')
+plt.grid()
+plt.legend()
+plt.show()
+
+# one-hot encoding of variation feature.
+variation_vectorizer = CountVectorizer()
+train_variation_feature_onehotCoding = variation_vectorizer.fit_transform(train_df['Variation'])
+test_variation_feature_onehotCoding = variation_vectorizer.transform(test_df['Variation'])
+cv_variation_feature_onehotCoding = variation_vectorizer.transform(cv_df['Variation'])
+
+# Lets look at shape of one hot encoder column for variation
+print(train_variation_feature_onehotCoding.shape)
+
+# alpha is used for laplace smoothing
+alpha = 1
+# train gene feature
+train_variation_feature_responseCoding = np.array(get_gv_feature(alpha, "Variation", train_df))
+# test gene feature
+test_variation_feature_responseCoding = np.array(get_gv_feature(alpha, "Variation", test_df))
+# cross validation gene feature
+cv_variation_feature_responseCoding = np.array(get_gv_feature(alpha, "Variation", cv_df))
+
+# Lets look at the shape of this response encoding result
+print(train_variation_feature_responseCoding.shape)
+
+# Lets again build the model with only column name of variation column
+# We need a hyperparemeter for SGD classifier.
+alpha = [10 ** x for x in range(-5, 1)]
+
+# We will be using SGD classifier
+# http://scikit-learn.org/stable/modules/generated/sklearn.linear_model.SGDClassifier.html
+# We will also be using Calibrated Classifier to get the result into probablity format t be used for log loss
+cv_log_error_array = []
+for i in alpha:
+    clf = SGDClassifier(alpha=i, penalty='l2', loss='log', random_state=42)
+    clf.fit(train_variation_feature_onehotCoding, y_train)
+
+    sig_clf = CalibratedClassifierCV(clf, method="sigmoid")
+    sig_clf.fit(train_variation_feature_onehotCoding, y_train)
+    predict_y = sig_clf.predict_proba(cv_variation_feature_onehotCoding)
+
+    cv_log_error_array.append(log_loss(y_cv, predict_y, labels=clf.classes_, eps=1e-15))
+    print('For values of alpha = ', i, "The log loss is:", log_loss(y_cv, predict_y, labels=clf.classes_, eps=1e-15))
+
+# Lets plot the same to check the best Alpha value
+fig, ax = plt.subplots()
+ax.plot(alpha, cv_log_error_array,c='g')
+for i, txt in enumerate(np.round(cv_log_error_array,3)):
+    ax.annotate((alpha[i],np.round(txt,3)), (alpha[i],cv_log_error_array[i]))
+plt.grid()
+plt.title("Cross Validation Error for each alpha")
+plt.xlabel("Alpha i's")
+plt.ylabel("Error measure")
+plt.show()
+
+best_alpha = np.argmin(cv_log_error_array)
+clf = SGDClassifier(alpha=alpha[best_alpha], penalty='l2', loss='log', random_state=42)
+clf.fit(train_variation_feature_onehotCoding, y_train)
+sig_clf = CalibratedClassifierCV(clf, method="sigmoid")
+sig_clf.fit(train_variation_feature_onehotCoding, y_train)
+
+predict_y = sig_clf.predict_proba(train_variation_feature_onehotCoding)
+print('For values of best alpha = ', alpha[best_alpha], "The train log loss is:",log_loss(y_train, predict_y, labels=clf.classes_, eps=1e-15))
+predict_y = sig_clf.predict_proba(cv_variation_feature_onehotCoding)
+print('For values of best alpha = ', alpha[best_alpha], "The cross validation log loss is:",log_loss(y_cv, predict_y, labels=clf.classes_, eps=1e-15))
+predict_y = sig_clf.predict_proba(test_variation_feature_onehotCoding)
+print('For values of best alpha = ', alpha[best_alpha], "The test log loss is:",log_loss(y_test, predict_y, labels=clf.classes_, eps=1e-15))
+
+test_coverage=test_df[test_df['Variation'].isin(list(set(train_df['Variation'])))].shape[0]
+cv_coverage=cv_df[cv_df['Variation'].isin(list(set(train_df['Variation'])))].shape[0]
+
+print('1. In test data',test_coverage, 'out of',test_df.shape[0], ":",(test_coverage/test_df.shape[0])*100)
+print('2. In cross validation data',cv_coverage, 'out of ',cv_df.shape[0],":" ,(cv_coverage/cv_df.shape[0])*100)
 
 
 
